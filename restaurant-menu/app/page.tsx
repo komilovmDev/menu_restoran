@@ -101,7 +101,7 @@ export default function RestaurantMenu() {
             id: item.id,
             name: item.name,
             description: item.description,
-            price: item.formatted_price,
+            price: parseFloat(item.price),
             image: item.image,
             category: item.category,
           });
