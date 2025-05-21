@@ -4,6 +4,11 @@ import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Plus, Minus, ShoppingBag, Menu, ChevronLeft, ChevronRight, Instagram, Phone, MapPin, MessageSquare } from "lucide-react";
+import { Swiper, SwiperSlide } from "swiper/react";
+import { Navigation, Pagination } from "swiper";
+import "swiper/css";
+import "swiper/css/navigation";
+import "swiper/css/pagination";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -27,87 +32,43 @@ export default function RestaurantMenu() {
   const [menuDataDynamic, setMenuDataDynamic] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const isMobile = useMobile(900); // Phones: < 900px
-  const isTablet = useMobile(1200) && !isMobile; // Tablets: ≥ 900px and < 1200px
-  const isLargeTablet = useMobile(1440) && !isTablet && !isMobile; // Large tablets: ≥ 1200px and < 1440px
-  const isPC = !isMobile && !isTablet && !isLargeTablet; // PCs: ≥ 1440px
+  const isMobile = useMobile(900);
+  const isTablet = useMobile(1200) && !isMobile;
+  const isLargeTablet = useMobile(1440) && !isTablet && !isMobile;
+  const isPC = !isMobile && !isTablet && !isLargeTablet;
   const categorySliderRef = useRef(null);
 
-  // Helper function to calculate visual width of a category name
   const calculateVisualWidth = (name) => {
     const charWidth = (isPC || isLargeTablet) ? { latin: 9, cyrillic: 11, emoji: 16 } : { latin: 8, cyrillic: 10, emoji: 16 };
     let width = 0;
-
     for (const char of name) {
-      if (char.match(/[A-Za-z0-9]/)) {
-        width += charWidth.latin; // Latin characters
-      } else if (char.match(/[\u0400-\u04FF]/)) {
-        width += charWidth.cyrillic; // Cyrillic characters
-      } else if (char.match(/[\uD83C-\uD83E]/)) {
-        width += charWidth.emoji; // Emojis
-      } else {
-        width += charWidth.latin; // Fallback for other characters
-      }
+      if (char.match(/[A-Za-z0-9]/)) width += charWidth.latin;
+      else if (char.match(/[\u0400-\u04FF]/)) width += charWidth.cyrillic;
+      else if (char.match(/[\uD83C-\uD83E]/)) width += charWidth.emoji;
+      else width += charWidth.latin;
     }
-
-    // Add padding (px-4 ≈ 32px total)
     width += 32;
     return width;
   };
 
-  // Helper function to determine border size based on visual width
-  const getBorderSize = (visualWidth) => {
-    if (visualWidth <= 100) return "1px";
-    if (visualWidth <= 150) return "2px";
-    return "3px";
-  };
+  const getBorderSize = (visualWidth) => (visualWidth <= 100 ? "1px" : visualWidth <= 150 ? "2px" : "3px");
+  const getFontSize = (visualWidth) => (visualWidth > 200 ? (isPC || isLargeTablet ? "text-sm" : "text-xs") : isPC || isLargeTablet ? "text-base" : "text-sm");
 
-  // Helper function to determine font size based on visual width
-  const getFontSize = (visualWidth) => {
-    if (visualWidth > 200) {
-      return (isPC || isLargeTablet) ? "text-sm" : "text-xs";
-    }
-    return (isPC || isLargeTablet) ? "text-base" : "text-sm";
-  };
-
-  // Fetch categories and menu items
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchCategories = async () => {
       try {
         setLoading(true);
         setError(null);
 
-        // Fetch categories
         const categoriesResponse = await fetch("https://menyu.work.gd/api/menu-categories/");
         if (!categoriesResponse.ok) throw new Error("Не удалось загрузить категории");
         const categoriesData = await categoriesResponse.json();
-        const categoriesFormatted = categoriesData.map((cat) => ({
-          id: cat.id,
-          name: cat.name,
-        }));
+        const categoriesFormatted = categoriesData.map((cat) => ({ id: cat.id, name: cat.name }));
         setCategories(categoriesFormatted);
-        setActiveCategory(categoriesData[0]?.id || null);
 
-        // Fetch menu items
-        const itemsResponse = await fetch("https://menyu.work.gd/api/menu-items/");
-        if (!itemsResponse.ok) throw new Error("Не удалось загрузить товары");
-        const itemsData = await itemsResponse.json();
-
-        // Group items by category ID
-        const groupedItems = itemsData.reduce((acc, item) => {
-          const categoryId = item.category.id;
-          if (!acc[categoryId]) acc[categoryId] = [];
-          acc[categoryId].push({
-            id: item.id,
-            name: item.name,
-            description: item.description,
-            price: parseFloat(item.price),
-            image: item.image,
-            category: item.category,
-          });
-          return acc;
-        }, {});
-        setMenuDataDynamic(groupedItems);
+        if (!activeCategory && categoriesData.length > 0) {
+          setActiveCategory(categoriesData[0].id);
+        }
       } catch (err) {
         console.error("API Error:", err);
         setError(err.message);
@@ -115,8 +76,43 @@ export default function RestaurantMenu() {
         setLoading(false);
       }
     };
-    fetchData();
+    fetchCategories();
   }, []);
+
+  useEffect(() => {
+    const fetchItems = async () => {
+      if (!activeCategory) return;
+
+      try {
+        setLoading(true);
+        setError(null);
+
+        const itemsResponse = await fetch(`https://menyu.work.gd/api/menu-items/?category=${activeCategory}`);
+        if (!itemsResponse.ok) throw new Error("Не удалось загрузить товары");
+        const itemsData = await itemsResponse.json();
+        const groupedItems = itemsData.reduce((acc, item) => {
+          const categoryId = item.category.id;
+          if (!acc[categoryId]) acc[categoryId] = [];
+          acc[categoryId].push({
+            id: item.id,
+            name: item.name,
+            description: item.description,
+            formatted_price: item.formatted_price,
+            image: item.image,
+            category: item.category,
+          });
+          return acc;
+        }, {});
+        setMenuDataDynamic((prev) => ({ ...prev, ...groupedItems }));
+      } catch (err) {
+        console.error("API Error:", err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchItems();
+  }, [activeCategory]);
 
   const handleCategoryChange = (categoryId) => {
     setActiveCategory(categoryId);
@@ -127,119 +123,78 @@ export default function RestaurantMenu() {
   const addToCart = (item) => {
     setCart((prevCart) => {
       const existingItem = prevCart.find((cartItem) => cartItem.id === item.id);
-      if (existingItem) {
-        return prevCart.map((cartItem) =>
-          cartItem.id === item.id ? { ...cartItem, quantity: cartItem.quantity + 1 } : cartItem
-        );
-      } else {
-        return [...prevCart, { ...item, quantity: 1 }];
-      }
+      return existingItem
+        ? prevCart.map((cartItem) =>
+            cartItem.id === item.id ? { ...cartItem, quantity: cartItem.quantity + 1 } : cartItem
+          )
+        : [...prevCart, { ...item, quantity: 1 }];
     });
   };
 
   const removeFromCart = (itemId) => {
-    setCart((prevCart) => {
-      const existingItem = prevCart.find((cartItem) => cartItem.id === itemId);
-      if (existingItem && existingItem.quantity > 1) {
-        return prevCart.map((cartItem) =>
-          cartItem.id === itemId ? { ...cartItem, quantity: cartItem.quantity - 1 } : cartItem
-        );
-      } else {
-        return prevCart.filter((cartItem) => cartItem.id !== itemId);
-      }
-    });
+    setCart((prevCart) =>
+      prevCart
+        .map((cartItem) =>
+          cartItem.id === itemId && cartItem.quantity > 1
+            ? { ...cartItem, quantity: cartItem.quantity - 1 }
+            : cartItem
+        )
+        .filter((cartItem) => cartItem.id !== itemId || cartItem.quantity > 0)
+    );
   };
 
   const scrollCategories = (direction) => {
     if (categorySliderRef.current) {
       const scrollAmount = isPC || isLargeTablet ? 300 : isTablet ? 250 : 200;
-      categorySliderRef.current.scrollBy({
-        left: direction === "left" ? -scrollAmount : scrollAmount,
-        behavior: "smooth",
-      });
+      categorySliderRef.current.scrollBy({ left: direction === "left" ? -scrollAmount : scrollAmount, behavior: "smooth" });
     }
   };
 
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
-  const totalPrice = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const totalPriceString = cart
+    .reduce((sum, item) => {
+      const priceNum = parseFloat(item.formatted_price.replace(/[^\d.]/g, '')) || 0;
+      return sum + priceNum * item.quantity;
+    }, 0)
+    .toLocaleString('ru-RU') + " сум";
 
-  // Cart Panel
   const CartPanel = ({ onClose }) => (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between p-4 sm:p-6 border-b" style={{ borderColor: colors.primary }}>
-        <h2
-          className={cn(
-            "font-sans font-bold",
-            isPC || isLargeTablet ? "text-2xl" : isTablet ? "text-xl" : "text-lg"
-          )}
-          style={{ color: colors.light }}
-        >
+        <h2 className={cn("font-sans font-bold", isPC || isLargeTablet ? "text-2xl" : isTablet ? "text-xl" : "text-lg")} style={{ color: colors.light }}>
           Ваш заказ
         </h2>
         {onClose && (
           <button className="p-1 rounded-full" style={{ backgroundColor: colors.primary }} onClick={onClose}>
-            <X
-              className={cn("w-5 h-5", isPC || isLargeTablet ? "w-6 h-6" : "w-5 h-5")}
-              style={{ color: colors.light }}
-            />
+            <X className={cn("w-5 h-5", isPC || isLargeTablet ? "w-6 h-6" : "w-5 h-5")} style={{ color: colors.light }} />
           </button>
         )}
       </div>
       <div className="flex-1 overflow-y-auto p-4 sm:p-6">
         {cart.length === 0 ? (
-          <p
-            className={cn(
-              "text-center py-8 font-sans opacity-70",
-              isPC || isLargeTablet ? "text-base" : "text-sm"
-            )}
-            style={{ color: colors.light }}
-          >
+          <p className={cn("text-center py-8 font-sans opacity-70", isPC || isLargeTablet ? "text-base" : "text-sm")} style={{ color: colors.light }}>
             Ваша корзина пуста
           </p>
         ) : (
           <ul className="space-y-4">
             {cart.map((item) => (
-              <li
-                key={item.id}
-                className="flex items-center justify-between pb-4 border-b"
-                style={{ borderColor: `${colors.primary}40` }}
-              >
+              <li key={item.id} className="flex items-center justify-between pb-4 border-b" style={{ borderColor: `${colors.primary}40` }}>
                 <div>
-                  <p
-                    className={cn(
-                      "font-sans font-medium",
-                      isPC || isLargeTablet ? "text-lg" : "text-base"
-                    )}
-                    style={{ color: colors.light }}
-                  >
+                  <p className={cn("font-sans font-medium", isPC || isLargeTablet ? "text-lg" : "text-base")} style={{ color: colors.light }}>
                     {item.name}
                   </p>
-                  <p
-                    className={cn("font-sans", isPC || isLargeTablet ? "text-base" : "text-sm")}
-                    style={{ color: `${colors.primary}` }}
-                  >
-                    {item.price.toFixed(0)} сум x {item.quantity}
+                  <p className={cn("font-sans", isPC || isLargeTablet ? "text-base" : "text-sm")} style={{ color: colors.primary }}>
+                    {item.formatted_price} x {item.quantity}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button
-                    className="p-1 rounded-full"
-                    style={{ backgroundColor: `${colors.primary}40` }}
-                    onClick={() => removeFromCart(item.id)}
-                  >
+                  <button className="p-1 rounded-full" style={{ backgroundColor: `${colors.primary}40` }} onClick={() => removeFromCart(item.id)}>
                     <Minus className="w-4 h-4" style={{ color: colors.light }} />
                   </button>
-                  <span
-                    className={cn("font-sans", isPC || isLargeTablet ? "text-base" : "text-sm")}
-                    style={{ color: colors.light }}
-                  >
+                  <span className={cn("font-sans", isPC || isLargeTablet ? "text-base" : "text-sm")} style={{ color: colors.light }}>
                     {item.quantity}
                   </span>
-                  <button
-                    className="p-1 rounded-full"
-                    style={{ backgroundColor: colors.primary }}
-                    onClick={() => addToCart(item)}
-                  >
+                  <button className="p-1 rounded-full" style={{ backgroundColor: colors.primary }} onClick={() => addToCart(item)}>
                     <Plus className="w-4 h-4" style={{ color: colors.light }} />
                   </button>
                 </div>
@@ -248,35 +203,22 @@ export default function RestaurantMenu() {
           </ul>
         )}
       </div>
-      <div className="p-4 sm:p-6 border-t" style={{ borderColor: colors.primary, backgroundColor: `${colors.dark}` }}>
+      <div className="p-4 sm:p-6 border-t" style={{ borderColor: colors.primary, backgroundColor: colors.dark }}>
         <div className="flex justify-between mb-4">
-          <span
-            className={cn("font-sans font-medium", isPC || isLargeTablet ? "text-lg" : "text-base")}
-            style={{ color: colors.light }}
-          >
+          <span className={cn("font-sans font-medium", isPC || isLargeTablet ? "text-lg" : "text-base")} style={{ color: colors.light }}>
             Итого
           </span>
-          <span
-            className={cn("font-sans font-bold", isPC || isLargeTablet ? "text-2xl" : "text-xl")}
-            style={{ color: colors.primary }}
-          >
-            {totalPrice.toFixed(0)} сум
+          <span className={cn("font-sans font-bold", isPC || isLargeTablet ? "text-2xl" : "text-xl")} style={{ color: colors.primary }}>
+            {totalPriceString}
           </span>
         </div>
-        <Button
-          className={cn("w-full font-sans", isPC || isLargeTablet ? "py-7 text-lg" : "py-6 text-base")}
-          style={{
-            backgroundColor: colors.primary,
-            color: colors.light,
-          }}
-        >
+        <Button className={cn("w-full font-sans", isPC || isLargeTablet ? "py-7 text-lg" : "py-6 text-base")} style={{ backgroundColor: colors.primary, color: colors.light }}>
           Оформить заказ
         </Button>
       </div>
     </div>
   );
 
-  // Promo Panel
   const PromoPanel = () => (
     <motion.div
       initial={{ opacity: 0 }}
@@ -290,96 +232,38 @@ export default function RestaurantMenu() {
         initial={{ y: 50, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: 50, opacity: 0 }}
-        className={cn(
-          "rounded-lg w-full",
-          isPC || isLargeTablet ? "max-w-lg p-8" : isTablet ? "max-w-md p-8" : "max-w-sm p-6"
-        )}
+        className={cn("rounded-lg w-full", isPC || isLargeTablet ? "max-w-lg p-8" : isTablet ? "max-w-md p-8" : "max-w-sm p-6")}
         style={{ backgroundColor: colors.dark }}
         onClick={(e) => e.stopPropagation()}
       >
-        <button
-          className="absolute top-4 right-4 p-1 rounded-full"
-          style={{ backgroundColor: colors.primary }}
-          onClick={() => setShowPromo(false)}
-        >
-          <X
-            className={cn("w-5 h-5", isPC || isLargeTablet || isTablet ? "w-6 h-6" : "w-5 h-5")}
-            style={{ color: colors.light }}
-          />
+        <button className="absolute top-4 right-4 p-1 rounded-full" style={{ backgroundColor: colors.primary }} onClick={() => setShowPromo(false)}>
+          <X className={cn("w-5 h-5", isPC || isLargeTablet || isTablet ? "w-6 h-6" : "w-5 h-5")} style={{ color: colors.light }} />
         </button>
-        <h3
-          className={cn(
-            "font-sans font-bold mb-4 text-center leading-tight",
-            isPC || isLargeTablet ? "text-3xl" : isTablet ? "text-2xl" : "text-xl"
-          )}
-          style={{ color: colors.light }}
-        >
+        <h3 className={cn("font-sans font-bold mb-4 text-center leading-tight", isPC || isLargeTablet ? "text-3xl" : isTablet ? "text-2xl" : "text-xl")} style={{ color: colors.light }}>
           HAYAT RIVER
         </h3>
         <div className={cn("space-y-4", isPC || isLargeTablet || isTablet ? "space-y-6" : "space-y-4")}>
-          <a
-            href="https://instagram.com/hayat_river"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-3 hover:opacity-80 transition-opacity"
-          >
-            <Instagram
-              className={cn("w-6 h-6", isPC || isLargeTablet || isTablet ? "w-7 h-7" : "w-6 h-6")}
-              style={{ color: colors.primary }}
-            />
-            <span
-              className={cn("font-sans leading-relaxed", isPC || isLargeTablet ? "text-lg" : isTablet ? "text-base" : "text-sm")}
-              style={{ color: colors.light }}
-            >
+          <a href="https://instagram.com/hayat_river" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+            <Instagram className={cn("w-6 h-6", isPC || isLargeTablet || isTablet ? "w-7 h-7" : "w-6 h-6")} style={{ color: colors.primary }} />
+            <span className={cn("font-sans leading-relaxed", isPC || isLargeTablet ? "text-lg" : isTablet ? "text-base" : "text-sm")} style={{ color: colors.light }}>
               @hayat_river
             </span>
           </a>
-          <a
-            href="tel:+15551234567"
-            className="flex items-center gap-3 hover:opacity-80 transition-opacity"
-          >
-            <Phone
-              className={cn("w-6 h-6", isPC || isLargeTablet || isTablet ? "w-7 h-7" : "w-6 h-6")}
-              style={{ color: colors.primary }}
-            />
-            <span
-              className={cn("font-sans leading-relaxed", isPC || isLargeTablet ? "text-lg" : isTablet ? "text-base" : "text-sm")}
-              style={{ color: colors.light }}
-            >
+          <a href="tel:+15551234567" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+            <Phone className={cn("w-6 h-6", isPC || isLargeTablet || isTablet ? "w-7 h-7" : "w-6 h-6")} style={{ color: colors.primary }} />
+            <span className={cn("font-sans leading-relaxed", isPC || isLargeTablet ? "text-lg" : isTablet ? "text-base" : "text-sm")} style={{ color: colors.light }}>
               +1 (555) 123-4567
             </span>
           </a>
-          <a
-            href="https://t.me/hayat_river"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-3 hover:opacity-80 transition-opacity"
-          >
-            <MessageSquare
-              className={cn("w-6 h-6", isPC || isLargeTablet || isTablet ? "w-7 h-7" : "w-6 h-6")}
-              style={{ color: colors.primary }}
-            />
-            <span
-              className={cn("font-sans leading-relaxed", isPC || isLargeTablet ? "text-lg" : isTablet ? "text-base" : "text-sm")}
-              style={{ color: colors.light }}
-            >
+          <a href="https://t.me/hayat_river" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+            <MessageSquare className={cn("w-6 h-6", isPC || isLargeTablet || isTablet ? "w-7 h-7" : "w-6 h-6")} style={{ color: colors.primary }} />
+            <span className={cn("font-sans leading-relaxed", isPC || isLargeTablet ? "text-lg" : isTablet ? "text-base" : "text-sm")} style={{ color: colors.light }}>
               Telegram
             </span>
           </a>
-          <a
-            href="https://maps.google.com/?q=123+River+St,+Food+City,+FC+12345"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-3 hover:opacity-80 transition-opacity"
-          >
-            <MapPin
-              className={cn("w-6 h-6", isPC || isLargeTablet || isTablet ? "w-7 h-7" : "w-6 h-6")}
-              style={{ color: colors.primary }}
-            />
-            <span
-              className={cn("font-sans leading-relaxed", isPC || isLargeTablet ? "text-lg" : isTablet ? "text-base" : "text-sm")}
-              style={{ color: colors.light }}
-            >
+          <a href="https://maps.google.com/?q=123+River+St,+Food+City,+FC+12345" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+            <MapPin className={cn("w-6 h-6", isPC || isLargeTablet || isTablet ? "w-7 h-7" : "w-6 h-6")} style={{ color: colors.primary }} />
+            <span className={cn("font-sans leading-relaxed", isPC || isLargeTablet ? "text-lg" : isTablet ? "text-base" : "text-sm")} style={{ color: colors.light }}>
               123 River St, Food City, FC 12345
             </span>
           </a>
@@ -390,14 +274,8 @@ export default function RestaurantMenu() {
 
   if (loading) {
     return (
-      <div
-        className="flex items-center justify-center min-h-screen"
-        style={{ backgroundColor: colors.light }}
-      >
-        <p
-          className={cn("font-sans text-lg", isPC || isLargeTablet ? "text-xl" : "text-lg")}
-          style={{ color: colors.dark }}
-        >
+      <div className="flex items-center justify-center min-h-screen" style={{ backgroundColor: colors.light }}>
+        <p className={cn("font-sans text-lg", isPC || isLargeTablet ? "text-xl" : "text-lg")} style={{ color: colors.dark }}>
           Загрузка...
         </p>
       </div>
@@ -406,59 +284,33 @@ export default function RestaurantMenu() {
 
   if (error) {
     return (
-      <div
-        className="flex items-center justify-center min-h-screen"
-        style={{ backgroundColor: colors.light }}
-      >
-        <p
-          className={cn("font-sans text-lg", isPC || isLargeTablet ? "text-xl" : "text-lg")}
-          style={{ color: colors.dark }}
-        >
+      <div className="flex items-center justify-center min-h-screen" style={{ backgroundColor: colors.light }}>
+        <p className={cn("font-sans text-lg", isPC || isLargeTablet ? "text-xl" : "text-lg")} style={{ color: colors.dark }}>
           Не удалось загрузить меню: {error}
         </p>
       </div>
     );
   }
 
+  const allItems = Object.values(menuDataDynamic).flat();
+  const initialSlideIndex = allItems.findIndex((item) => item.id === selectedItem);
+
   return (
     <div className="relative min-h-screen" style={{ backgroundColor: colors.light }}>
-      {/* Header */}
-      <div
-        className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 py-4"
-        style={{ backgroundColor: `${colors.dark}CC` }}
-      >
+      <div className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 py-4" style={{ backgroundColor: `${colors.dark}CC` }}>
         <div className="flex items-center">
           <button onClick={() => setShowPromo(true)} className="relative w-10 h-10 sm:w-12 sm:h-12">
             <Image src="/images/logo.png" alt="HAYAT RIVER" fill className="object-contain" />
           </button>
-          <h1
-            className={cn(
-              "ml-3 font-sans font-bold hidden sm:block",
-              isPC || isLargeTablet ? "text-3xl" : isTablet ? "text-2xl" : "text-xl"
-            )}
-            style={{ color: colors.light }}
-          >
+          <h1 className={cn("ml-3 font-sans font-bold hidden sm:block", isPC || isLargeTablet ? "text-3xl" : isTablet ? "text-2xl" : "text-xl")} style={{ color: colors.light }}>
             HAYAT RIVER
           </h1>
         </div>
         <div className="flex items-center gap-3">
-          <button
-            className="p-2 rounded-full"
-            style={{ backgroundColor: colors.primary }}
-            onClick={() => setShowCart(!showCart)}
-          >
-            <ShoppingBag
-              className={cn("w-5 h-5", isPC || isLargeTablet ? "sm:w-7 sm:h-7" : "sm:w-6 sm:h-6")}
-              style={{ color: colors.light }}
-            />
+          <button className="p-2 rounded-full" style={{ backgroundColor: colors.primary }} onClick={() => setShowCart(!showCart)}>
+            <ShoppingBag className={cn("w-5 h-5", isPC || isLargeTablet ? "sm:w-7 sm:h-7" : "sm:w-6 sm:h-6")} style={{ color: colors.light }} />
             {totalItems > 0 && (
-              <span
-                className={cn(
-                  "absolute -top-1 -right-1 flex items-center justify-center text-xs rounded-full",
-                  isPC || isLargeTablet ? "w-6 h-6" : "w-5 h-5"
-                )}
-                style={{ backgroundColor: colors.dark, color: colors.light }}
-              >
+              <span className={cn("absolute -top-1 -right-1 flex items-center justify-center text-xs rounded-full", isPC || isLargeTablet ? "w-6 h-6" : "w-5 h-5")} style={{ backgroundColor: colors.dark, color: colors.light }}>
                 {totalItems}
               </span>
             )}
@@ -467,10 +319,7 @@ export default function RestaurantMenu() {
             <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
               <SheetTrigger asChild>
                 <button className="p-2 rounded-full" style={{ backgroundColor: colors.primary }}>
-                  <Menu
-                    className={cn("w-5 h-5", isPC || isLargeTablet ? "w-6 h-6" : "w-5 h-5")}
-                    style={{ color: colors.light }}
-                  />
+                  <Menu className={cn("w-5 h-5", isPC || isLargeTablet ? "w-6 h-6" : "w-5 h-5")} style={{ color: colors.light }} />
                 </button>
               </SheetTrigger>
               <SheetContent side="left" className="w-[250px] p-0 border-none" style={{ backgroundColor: colors.dark }}>
@@ -506,32 +355,14 @@ export default function RestaurantMenu() {
         </div>
       </div>
 
-      {/* Category Slider */}
-      <div
-        className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-between px-4 py-3"
-        style={{ backgroundColor: `${colors.dark}E6` }}
-      >
-        <button
-          className={cn("p-2 rounded-full", isPC || isLargeTablet || isTablet ? "p-3" : "p-2")}
-          style={{ backgroundColor: colors.primary }}
-          onClick={() => scrollCategories("left")}
-        >
-          <ChevronLeft
-            className={cn("w-5 h-5", isPC || isLargeTablet || isTablet ? "w-6 h-6" : "w-5 h-5")}
-            style={{ color: colors.light }}
-          />
+      <div className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-between px-4 py-3" style={{ backgroundColor: `${colors.dark}E6` }}>
+        <button className={cn("p-2 rounded-full", isPC || isLargeTablet || isTablet ? "p-3" : "p-2")} style={{ backgroundColor: colors.primary }} onClick={() => scrollCategories("left")}>
+          <ChevronLeft className={cn("w-5 h-5", isPC || isLargeTablet || isTablet ? "w-6 h-6" : "w-5 h-5")} style={{ color: colors.light }} />
         </button>
-        <div
-          ref={categorySliderRef}
-          className="flex overflow-x-auto space-x-4 scrollbar-hide"
-          style={{ scrollBehavior: "smooth" }}
-        >
+        <div ref={categorySliderRef} className="flex overflow-x-auto space-x-4 scrollbar-hide" style={{ scrollBehavior: "smooth" }}>
           {categories.map((category) => {
             const visualWidth = calculateVisualWidth(category.name);
-            const minWidth = Math.max(
-              visualWidth,
-              isPC || isLargeTablet ? 140 : isTablet ? 120 : 100
-            );
+            const minWidth = Math.max(visualWidth, isPC || isLargeTablet ? 140 : isTablet ? 120 : 100);
             return (
               <button
                 key={category.id}
@@ -546,9 +377,7 @@ export default function RestaurantMenu() {
                   minWidth: `${minWidth}px`,
                   backgroundColor: activeCategory === category.id ? colors.primary : "transparent",
                   color: colors.light,
-                  border: activeCategory === category.id 
-                    ? "transparent" 
-                    : `${getBorderSize(visualWidth)} solid ${colors.primary}`,
+                  border: activeCategory === category.id ? "transparent" : `${getBorderSize(visualWidth)} solid ${colors.primary}`,
                 }}
               >
                 {category.name}
@@ -556,25 +385,12 @@ export default function RestaurantMenu() {
             );
           })}
         </div>
-        <button
-          className={cn("p-2 rounded-full", isPC || isLargeTablet || isTablet ? "p-3" : "p-2")}
-          style={{ backgroundColor: colors.primary }}
-          onClick={() => scrollCategories("right")}
-        >
-          <ChevronRight
-            className={cn("w-5 h-5", isPC || isLargeTablet || isTablet ? "w-6 h-6" : "w-5 h-5")}
-            style={{ color: colors.light }}
-          />
+        <button className={cn("p-2 rounded-full", isPC || isLargeTablet || isTablet ? "p-3" : "p-2")} style={{ backgroundColor: colors.primary }} onClick={() => scrollCategories("right")}>
+          <ChevronRight className={cn("w-5 h-5", isPC || isLargeTablet || isTablet ? "w-6 h-6" : "w-5 h-5")} style={{ color: colors.light }} />
         </button>
       </div>
 
-      {/* Main Content Area */}
-      <div
-        className={cn(
-          isMobile ? "pt-24 pb-20" : "pt-32 pb-20",
-          isPC || isLargeTablet || isTablet ? "px-8" : "px-4"
-        )}
-      >
+      <div className={cn(isMobile ? "pt-24 pb-20" : "pt-32 pb-20", isPC || isLargeTablet || isTablet ? "px-8" : "px-4")}>
         <AnimatePresence mode="wait">
           {activeCategory && (
             <motion.div
@@ -620,7 +436,8 @@ export default function RestaurantMenu() {
                         fill
                         className="object-cover"
                         sizes="(max-width: 900px) 100vw, 50vw"
-                        quality={75}
+                        quality={50}
+                        loading="lazy"
                       />
                     </div>
                     <div className="flex-1">
@@ -652,7 +469,7 @@ export default function RestaurantMenu() {
                           )}
                           style={{ color: colors.primary }}
                         >
-                          {item.price.toFixed(0)} сум
+                          {item.formatted_price}
                         </p>
                         <Button
                           onClick={(e) => {
@@ -663,10 +480,7 @@ export default function RestaurantMenu() {
                             "font-sans rounded-full",
                             isPC || isLargeTablet ? "px-6 py-2 text-base" : isTablet ? "px-5 py-1.5 text-sm" : "px-4 py-1 text-sm"
                           )}
-                          style={{
-                            backgroundColor: colors.primary,
-                            color: colors.light,
-                          }}
+                          style={{ backgroundColor: colors.primary, color: colors.light }}
                         >
                           Добавить
                         </Button>
@@ -691,7 +505,6 @@ export default function RestaurantMenu() {
         </AnimatePresence>
       </div>
 
-      {/* Shopping Cart Slide-in */}
       <AnimatePresence>
         {showCart && (
           <motion.div
@@ -707,7 +520,6 @@ export default function RestaurantMenu() {
         )}
       </AnimatePresence>
 
-      {/* Selected Item Modal */}
       <AnimatePresence>
         {selectedItem && (
           <motion.div
@@ -723,8 +535,8 @@ export default function RestaurantMenu() {
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: 50, opacity: 0 }}
               className={cn(
-                "bg-white rounded-lg w-full",
-                isMobile ? "max-w-2xl p-10" : isTablet ? "max-w-3xl p-12" : "max-w-4xl p-14"
+                "bg-white rounded-lg w-full max-w-4xl",
+                isMobile ? "p-6" : isTablet ? "p-8" : "p-10"
               )}
               style={{ backgroundColor: colors.dark }}
               onClick={(e) => e.stopPropagation()}
@@ -739,84 +551,105 @@ export default function RestaurantMenu() {
                   style={{ color: colors.light }}
                 />
               </button>
-              {Object.values(menuDataDynamic)
-                .flat()
-                .filter((item) => item.id === selectedItem)
-                .map((item) => (
-                  <div key={item.id} className="flex flex-col gap-6">
-                    <div
-                      className={cn(
-                        "relative w-full rounded-lg overflow-hidden",
-                        isMobile ? "h-80" : isTablet ? "h-96" : "h-112"
-                      )}
-                    >
-                      <Image
-                        src={item.image || "/placeholder.svg"}
-                        alt={item.name}
-                        fill
-                        className="object-cover"
-                        sizes="100vw"
-                        quality={75}
-                      />
-                    </div>
-                    <div>
-                      <h3
+              <Swiper
+                modules={[Navigation, Pagination]}
+                spaceBetween={50}
+                slidesPerView={1}
+                navigation={{
+                  prevEl: ".custom-prev",
+                  nextEl: ".custom-next",
+                }}
+                pagination={{
+                  el: ".custom-pagination",
+                  clickable: true,
+                }}
+                initialSlide={initialSlideIndex >= 0 ? initialSlideIndex : 0}
+                style={{ width: "100%", height: "auto" }}
+              >
+                {allItems.map((item) => (
+                  <SwiperSlide key={item.id}>
+                    <div className="flex flex-col">
+                      <div
                         className={cn(
-                          "font-sans font-bold mb-4 leading-tight",
-                          isMobile ? "text-3xl" : isTablet ? "text-4xl" : "text-5xl"
+                          "relative w-full",
+                          isMobile ? "h-64" : isTablet ? "h-80" : "h-96"
                         )}
-                        style={{ color: colors.light }}
                       >
-                        {item.name}
-                      </h3>
-                      <p
-                        className={cn(
-                          "font-sans mb-6 opacity-90 leading-relaxed",
-                          isMobile ? "text-lg" : isTablet ? "text-xl" : "text-2xl"
-                        )}
-                        style={{ color: colors.light }}
-                      >
-                        {item.description}
-                      </p>
-                      <div className="flex items-center justify-between">
+                        <Image
+                          src={item.image || "/placeholder.svg"}
+                          alt={item.name}
+                          fill
+                          className="object-cover"
+                          sizes="100vw"
+                          quality={50}
+                          loading="lazy"
+                        />
+                      </div>
+                      <div className="p-6">
+                        <h3
+                          className={cn(
+                            "font-sans font-bold mb-4 leading-tight",
+                            isMobile ? "text-2xl" : isTablet ? "text-3xl" : "text-4xl"
+                          )}
+                          style={{ color: colors.light }}
+                        >
+                          {item.name}
+                        </h3>
                         <p
                           className={cn(
-                            "font-sans font-bold",
-                            isMobile ? "text-3xl" : isTablet ? "text-4xl" : "text-5xl"
+                            "font-sans mb-6 opacity-90 leading-relaxed",
+                            isMobile ? "text-base" : isTablet ? "text-lg" : "text-xl"
                           )}
-                          style={{ color: colors.primary }}
+                          style={{ color: colors.light }}
                         >
-                          {item.price.toFixed(0)} сум
+                          {item.description}
                         </p>
-                        <Button
-                          onClick={() => {
-                            addToCart(item);
-                            setSelectedItem(null);
-                          }}
-                          className={cn(
-                            "font-sans rounded-full",
-                            isMobile ? "px-8 py-3 text-lg" : isTablet ? "px-10 py-4 text-xl" : "px-12 py-5 text-2xl"
-                          )}
-                          style={{
-                            backgroundColor: colors.primary,
-                            color: colors.light,
-                          }}
-                        >
-                          Добавить в заказ
-                        </Button>
+                        <div className="flex items-center justify-between">
+                          <p
+                            className={cn(
+                              "font-sans font-bold",
+                              isMobile ? "text-2xl" : isTablet ? "text-3xl" : "text-4xl"
+                            )}
+                            style={{ color: colors.primary }}
+                          >
+                            {item.formatted_price}
+                          </p>
+                          <Button
+                            onClick={() => {
+                              addToCart(item);
+                              setSelectedItem(null);
+                            }}
+                            className={cn(
+                              "font-sans rounded-full",
+                              isMobile ? "px-6 py-2 text-base" : isTablet ? "px-8 py-3 text-lg" : "px-10 py-4 text-xl"
+                            )}
+                            style={{ backgroundColor: colors.primary, color: colors.light }}
+                          >
+                            Добавить в заказ
+                          </Button>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  </SwiperSlide>
                 ))}
+              </Swiper>
+              {/* Custom Navigation Buttons */}
+              <div className="flex justify-between mt-4">
+                <button className="custom-prev p-2 rounded-full" style={{ backgroundColor: colors.primary }}>
+                  <ChevronLeft className={cn("w-6 h-6", isTablet ? "w-7 h-7" : isPC || isLargeTablet ? "w-8 h-8" : "w-6 h-6")} style={{ color: colors.light }} />
+                </button>
+                <button className="custom-next p-2 rounded-full" style={{ backgroundColor: colors.primary }}>
+                  <ChevronRight className={cn("w-6 h-6", isTablet ? "w-7 h-7" : isPC || isLargeTablet ? "w-8 h-8" : "w-6 h-6")} style={{ color: colors.light }} />
+                </button>
+              </div>
+              {/* Custom Pagination */}
+              <div className="custom-pagination mt-4 flex justify-center" />
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Promo Panel */}
-      <AnimatePresence>
-        {showPromo && <PromoPanel />}
-      </AnimatePresence>
+      <AnimatePresence>{showPromo && <PromoPanel />}</AnimatePresence>
     </div>
   );
 }
