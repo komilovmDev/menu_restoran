@@ -292,9 +292,6 @@ export default function RestaurantMenu() {
     );
   }
 
-  const allItems = Object.values(menuDataDynamic).flat();
-  const initialSlideIndex = allItems.findIndex((item) => item.id === selectedItem);
-
   return (
     <div className="relative min-h-screen" style={{ backgroundColor: colors.light }}>
       <div className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 py-4" style={{ backgroundColor: `${colors.dark}CC` }}>
@@ -551,88 +548,93 @@ export default function RestaurantMenu() {
                   style={{ color: colors.light }}
                 />
               </button>
-              <Swiper
-                modules={[Navigation, Pagination]}
-                spaceBetween={50}
-                slidesPerView={1}
-                navigation={{
-                  prevEl: ".custom-prev",
-                  nextEl: ".custom-next",
-                }}
-                pagination={{
-                  el: ".custom-pagination",
-                  clickable: true,
-                }}
-                initialSlide={initialSlideIndex >= 0 ? initialSlideIndex : 0}
-                style={{ width: "100%", height: "auto" }}
-              >
-                {allItems.map((item) => (
-                  <SwiperSlide key={item.id}>
-                    <div className="flex flex-col">
-                      <div
-                        className={cn(
-                          "relative w-full",
-                          isMobile ? "h-64" : isTablet ? "h-80" : "h-96"
-                        )}
-                      >
-                        <Image
-                          src={item.image || "/placeholder.svg"}
-                          alt={item.name}
-                          fill
-                          className="object-cover"
-                          sizes="100vw"
-                          quality={50}
-                          loading="lazy"
-                        />
-                      </div>
-                      <div className="p-6">
-                        <h3
+              {/* Faqat activeCategory ga tegishli taomlarni olish */}
+              {activeCategory && menuDataDynamic[activeCategory] && (
+                <Swiper
+                  modules={[Navigation, Pagination]}
+                  spaceBetween={50}
+                  slidesPerView={1}
+                  navigation={{
+                    prevEl: ".custom-prev",
+                    nextEl: ".custom-next",
+                  }}
+                  pagination={{
+                    el: ".custom-pagination",
+                    clickable: true,
+                  }}
+                  initialSlide={menuDataDynamic[activeCategory].findIndex((item) => item.id === selectedItem) >= 0
+                    ? menuDataDynamic[activeCategory].findIndex((item) => item.id === selectedItem)
+                    : 0}
+                  style={{ width: "100%", height: "auto" }}
+                >
+                  {menuDataDynamic[activeCategory].map((item) => (
+                    <SwiperSlide key={item.id}>
+                      <div className="flex flex-col">
+                        <div
                           className={cn(
-                            "font-sans font-bold mb-4 leading-tight",
-                            isMobile ? "text-2xl" : isTablet ? "text-3xl" : "text-4xl"
+                            "relative w-full",
+                            isMobile ? "h-64" : isTablet ? "h-80" : "h-96"
                           )}
-                          style={{ color: colors.light }}
                         >
-                          {item.name}
-                        </h3>
-                        <p
-                          className={cn(
-                            "font-sans mb-6 opacity-90 leading-relaxed",
-                            isMobile ? "text-base" : isTablet ? "text-lg" : "text-xl"
-                          )}
-                          style={{ color: colors.light }}
-                        >
-                          {item.description}
-                        </p>
-                        <div className="flex items-center justify-between">
-                          <p
+                          <Image
+                            src={item.image || "/placeholder.svg"}
+                            alt={item.name}
+                            fill
+                            className="object-cover"
+                            sizes="100vw"
+                            quality={50}
+                            loading="lazy"
+                          />
+                        </div>
+                        <div className="p-6">
+                          <h3
                             className={cn(
-                              "font-sans font-bold",
+                              "font-sans font-bold mb-4 leading-tight",
                               isMobile ? "text-2xl" : isTablet ? "text-3xl" : "text-4xl"
                             )}
-                            style={{ color: colors.primary }}
+                            style={{ color: colors.light }}
                           >
-                            {item.formatted_price}
-                          </p>
-                          <Button
-                            onClick={() => {
-                              addToCart(item);
-                              setSelectedItem(null);
-                            }}
+                            {item.name}
+                          </h3>
+                          <p
                             className={cn(
-                              "font-sans rounded-full",
-                              isMobile ? "px-6 py-2 text-base" : isTablet ? "px-8 py-3 text-lg" : "px-10 py-4 text-xl"
+                              "font-sans mb-6 opacity-90 leading-relaxed",
+                              isMobile ? "text-base" : isTablet ? "text-lg" : "text-xl"
                             )}
-                            style={{ backgroundColor: colors.primary, color: colors.light }}
+                            style={{ color: colors.light }}
                           >
-                            Добавить в заказ
-                          </Button>
+                            {item.description}
+                          </p>
+                          <div className="flex items-center justify-between">
+                            <p
+                              className={cn(
+                                "font-sans font-bold",
+                                isMobile ? "text-2xl" : isTablet ? "text-3xl" : "text-4xl"
+                              )}
+                              style={{ color: colors.primary }}
+                            >
+                              {item.formatted_price}
+                            </p>
+                            <Button
+                              onClick={() => {
+                                addToCart(item);
+                                setSelectedItem(null);
+                              }}
+                              className={cn(
+                                "font-sans rounded-full",
+                                isMobile ? "px-6 py-2 text-base" : isTablet ? "px-8 py-3 text-lg" : "px-10 py-4 text-xl"
+                              )}
+                              style={{ backgroundColor: colors.primary, color: colors.light }}
+                            >
+                              Добавить в заказ
+                            </Button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </SwiperSlide>
-                ))}
-              </Swiper>
+                    </SwiperSlide>
+                  ))}
+                </Swiper>
+              )}
               {/* Custom Navigation Buttons */}
               <div className="flex justify-between mt-4">
                 <button className="custom-prev p-2 rounded-full" style={{ backgroundColor: colors.primary }}>
