@@ -125,8 +125,8 @@ export default function RestaurantMenu() {
       const existingItem = prevCart.find((cartItem) => cartItem.id === item.id);
       return existingItem
         ? prevCart.map((cartItem) =>
-            cartItem.id === item.id ? { ...cartItem, quantity: cartItem.quantity + 1 } : cartItem
-          )
+          cartItem.id === item.id ? { ...cartItem, quantity: cartItem.quantity + 1 } : cartItem
+        )
         : [...prevCart, { ...item, quantity: 1 }];
     });
   };
@@ -562,9 +562,11 @@ export default function RestaurantMenu() {
                     el: ".custom-pagination",
                     clickable: true,
                   }}
-                  initialSlide={menuDataDynamic[activeCategory].findIndex((item) => item.id === selectedItem) >= 0
-                    ? menuDataDynamic[activeCategory].findIndex((item) => item.id === selectedItem)
-                    : 0}
+                  initialSlide={
+                    menuDataDynamic[activeCategory].findIndex((item) => item.id === selectedItem) >= 0
+                      ? menuDataDynamic[activeCategory].findIndex((item) => item.id === selectedItem)
+                      : 0
+                  }
                   style={{ width: "100%", height: "auto" }}
                 >
                   {menuDataDynamic[activeCategory].map((item) => (
@@ -573,16 +575,18 @@ export default function RestaurantMenu() {
                         <div
                           className={cn(
                             "relative w-full",
-                            isMobile ? "h-64" : isTablet ? "h-80" : "h-96"
+                            isMobile ? "h-64" : isTablet ? "h-96" : "h-[500px]", // Planshet uchun balandlikni oshirdik
+                            "rounded-lg overflow-hidden"
                           )}
+                          style={{ aspectRatio: "4/3" }} // Rasm nisbatini saqlash uchun
                         >
                           <Image
                             src={item.image || "/placeholder.svg"}
                             alt={item.name}
                             fill
-                            className="object-cover"
+                            className="object-contain" // object-cover o‘rniga object-contain
                             sizes="100vw"
-                            quality={50}
+                            quality={75} // Sifatni biroz oshirdik
                             loading="lazy"
                           />
                         </div>
