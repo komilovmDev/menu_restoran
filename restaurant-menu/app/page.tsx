@@ -264,7 +264,7 @@ export default function RestaurantMenu() {
           <a href="https://maps.app.goo.gl/hdm2JwCzvsgYoEmEA?g_st=com.google.maps.preview.copy" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
             <MapPin className={cn("w-6 h-6", isPC || isLargeTablet || isTablet ? "w-7 h-7" : "w-6 h-6")} style={{ color: colors.primary }} />
             <span className={cn("font-sans leading-relaxed", isPC || isLargeTablet ? "text-lg" : isTablet ? "text-base" : "text-sm")} style={{ color: colors.light }}>
-              123 River St, Food City, FC 12345
+              Hayat River Restaurant
             </span>
           </a>
         </div>
